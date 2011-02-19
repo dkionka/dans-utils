@@ -1,0 +1,43 @@
+#!/bin/bash -epu
+#
+# cp versioned files to 0save
+
+SAVE_DIR_BASE=0save
+
+# cd to common dir
+com_dir=
+files=
+for file; do
+    fdir=$(dirname $file)
+    fbase=$(basename $file)
+    test -n "$com_dir" || com_dir=$fdir
+    if [ "$com_dir" != "$fdir" ]; then
+        echo $0: Must have common dir: $com_dir, $fdir 1>&2
+        exit 1
+    fi
+    files="$files $fbase"
+done
+
+# create save dir
+SAVE_DIR=$SAVE_DIR_BASE
+test "$com_dir" = "." || SAVE_DIR=$com_dir/$SAVE_DIR_BASE
+test -d $SAVE_DIR || mkdir $SAVE_DIR
+
+# find highest version
+highest=0
+for file in $files; do
+    last=$(ls -d $SAVE_DIR/$file* | sed -n "s,.*$file[-.]0*\([1-9][0-9]*\).*,\1,p" | sort -n | tail -n1)
+    test -z "$last" || (( ( highest > last ) || ( highest = last ) ))
+done
+
+# save files
+version=$(printf "%03d" $(( highest + 1 )))
+out_list=
+for file in $files; do
+    out=$SAVE_DIR/$file.$version
+    cp -a $com_dir/$file $out
+    out_list="$out_list $out"
+done
+ls -lGd $out_list
+
+: $0: Succeeded
