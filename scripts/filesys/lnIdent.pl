@@ -1,7 +1,5 @@
 #!/usr/bin/env perl
 #
-# $Header: /cvsroot/gdbi/src/build/lnIdent.pl,v 1.3 2007/08/17 23:43:42 dkionka Exp $
-#
 # Copyright (c) 2006-2007 Daniel P. Kionka; all rights reserved
 #
 # Permission is hereby granted, free of charge, to any person obtaining
