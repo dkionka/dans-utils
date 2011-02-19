@@ -1,0 +1,27 @@
+#!/bin/bash -pu
+#
+# Rename arguments to *-old, first renaming the previous -old to -del and
+# deleting it in the background.
+ 
+SUFFIX_DEL=-del
+SUFFIX_OLD=-old
+ 
+for file_raw in $*; do
+    file=$(echo $file_raw | sed 's,/$,,')
+    echo $0: $file...
+    if [ -e $file ]; then
+        if [ -e $file$SUFFIX_OLD ]; then
+            echo $0: Removing previous: $file$SUFFIX_OLD
+            if [ -e $file$SUFFIX_DEL ]; then
+                $0 $file$SUFFIX_DEL # run recursively
+            fi
+            mv -f $file$SUFFIX_OLD $file$SUFFIX_DEL
+            rm -rf $file$SUFFIX_DEL &
+        fi
+        mv -f $file $file$SUFFIX_OLD
+    else
+        echo $0: Not found: $file
+    fi
+done
+ 
+echo $0: Succeeded
