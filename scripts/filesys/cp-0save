@@ -23,21 +23,40 @@ SAVE_DIR=$SAVE_DIR_BASE
 test "$com_dir" = "." || SAVE_DIR=$com_dir/$SAVE_DIR_BASE
 test -d $SAVE_DIR || mkdir $SAVE_DIR
 
-# find highest version
-highest=0
-for file in $files; do
-    last=$(ls -d $SAVE_DIR/$file* | sed -n "s,.*$file[-.]0*\([1-9][0-9]*\).*,\1,p" | sort -n | tail -n1)
-    test -z "$last" || (( ( highest > last ) || ( highest = last ) ))
-done
-
-# save files
-version=$(printf "%03d" $(( highest + 1 )))
+# any files changed?
+changed=0
 out_list=
 for file in $files; do
-    out=$SAVE_DIR/$file.$version
-    cp -a $com_dir/$file $out
-    out_list="$out_list $out"
+    if (( ! changed )); then
+        last=$(ls -d $SAVE_DIR/$file* 2>/dev/null | sort -n | tail -n1)
+        changed=1
+        if [ -n "$last" ] && cmp -s $file $last; then
+            changed=0
+            out_list="$out_list $last"
+        fi
+    fi
 done
+
+if (( changed )); then
+
+    # find highest version
+    highest=0
+    for file in $files; do
+        last=$(ls -d $SAVE_DIR/$file* | sed -n "s,.*$file[-.]0*\([1-9][0-9]*\).*,\1,p" | sort -n | tail -n1)
+        test -z "$last" || (( ( highest > last ) || ( highest = last ) ))
+    done
+
+    # save files
+    version=$(printf "%03d" $(( highest + 1 )))
+    out_list=
+    for file in $files; do
+        out=$SAVE_DIR/$file.$version
+        cp -a $com_dir/$file $out
+        out_list="$out_list $out"
+    done
+fi
+
+# list of identical or copies
 ls -lGd $out_list
 
 : $0: Succeeded
