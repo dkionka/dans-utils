@@ -28,11 +28,11 @@ changed=0
 out_list=
 for file in $files; do
     if (( ! changed )); then
-        last=$(ls -d $SAVE_DIR/$file* 2>/dev/null | sort -n | tail -n1)
+        flast=$(ls -d $SAVE_DIR/$file* | grep "$file[-.][0-9][0-9]*" | sort -n | tail -n1)
         changed=1
-        if [ -n "$last" ] && cmp -s $file $last; then
+        if [ -n "$flast" ] && cmp -s $file $flast; then
             changed=0
-            out_list="$out_list $last"
+            out_list="$out_list $flast"
         fi
     fi
 done
