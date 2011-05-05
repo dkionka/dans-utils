@@ -1,0 +1,29 @@
+#!/bin/bash -pu
+# remove all non-p4 files
+
+P4ROOT=$(p4 client -o | sed -n 's/^Root:\s*//p')
+
+ROOT_SAVE=$P4ROOT.save
+
+test ! -d $ROOT_SAVE
+mv -f $P4ROOT $ROOT_SAVE
+
+echo $0: Running p4 sync...
+p4 sync -fn |
+	# refreshing or updating
+	sed "s,.* .*ing $P4ROOT,," |
+	while read file; do
+		src="$ROOT_SAVE/$file"
+		des="$P4ROOT/$file"
+		test -r "$src"
+		dir=$(dirname "$des")
+		mkdir -p "$dir"
+		ln "$src" "$des"
+	done
+
+test $? -eq 0
+
+echo $0: Checking for missing files...
+p4 diff -sd
+
+echo $0: Succeeded
