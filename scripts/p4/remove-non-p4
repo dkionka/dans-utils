@@ -1,29 +1,42 @@
-#!/bin/bash -pu
+#!/bin/bash -epux
 # remove all non-p4 files
+# supports p4 under Cygwin
 
-P4ROOT=$(p4 client -o | sed -n 's/^Root:\s*//p')
+if (( $# )); then
+	cd ${1:-.}
+else
+	P4ROOT=$(p4 client -o | sed -n 's/^Root:\s*//p')
+	cd $P4ROOT
+fi
 
-ROOT_SAVE=$P4ROOT.save
+TOP_OUT=$(cygpath -m $(pwd))
+TOP_SAVE=$TOP_OUT.save
 
-test ! -d $ROOT_SAVE
-mv -f $P4ROOT $ROOT_SAVE
+test ! -d $TOP_SAVE
+cd ..
+mv -f $TOP_OUT $TOP_SAVE
+mkdir $TOP_OUT
+cd $TOP_OUT
 
 echo $0: Running p4 sync...
-p4 sync -fn |
+p4 sync -fn ... |
 	# refreshing or updating
-	sed "s,.* .*ing $P4ROOT,," |
+	sed -n -e 's,\\,/,g' -e "s,.* .*ing $TOP_OUT/,,p" |
 	while read file; do
-		src="$ROOT_SAVE/$file"
-		des="$P4ROOT/$file"
+		src="$TOP_SAVE/$file"
+		des="$TOP_OUT/$file"
 		test -r "$src"
 		dir=$(dirname "$des")
 		mkdir -p "$dir"
 		ln "$src" "$des"
 	done
 
-test $? -eq 0
+if (( $? )); then
+	echo $0: Error moving files from: $TOP_SAVE 1>&2
+	exit 1
+fi
 
 echo $0: Checking for missing files...
-p4 diff -sd
+p4 diff -sd ...
 
 echo $0: Succeeded
