@@ -1,6 +1,8 @@
 #!/usr/bin/env perl
 #
-# Copyright (c) 2006-2007 Daniel P. Kionka; all rights reserved
+# $Header: /cvsroot-fuse/gdbi/src/build/lnIdent.pl,v 1.3 2007/08/17 23:43:42 dkionka Exp $
+#
+# Copyright (c) 2006-2016 Daniel P. Kionka; all rights reserved
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -46,6 +48,7 @@ use warnings;
 
 use Data::Dumper;
 use File::Basename;
+use File::Compare;
 use File::Find;
 use File::stat;
 use Getopt::Long;
@@ -111,21 +114,22 @@ sub areIdentical($$)
 {
     my ($file1, $file2) = @_;
 
-    # read both files to compare
-    open FILE1, "<", $file1 || return 0;
-    open FILE2, "<", $file2;
-    my $same = 1;
-    while (my $line1 = <FILE1>) {
-        my $line2 = <FILE2>;
-        if ($line1 ne $line2) {
-            $same = 0;
-            last;
+    # compare file modes (execute, writable)
+    return 0 if (((-x $file1) * 2 + (-w $file1) * 4) != ((-x $file2) * 2 + (-w $file2) * 4));
+
+    # compare symlinks
+    my $link1 = readlink($file1);
+    my $link2 = readlink($file2);
+    if (defined($link1) || defined($link2)) {
+        print "symlinks: $link1,$link2\n" if ($debug);
+        return 0 if (! (defined($link1) && defined($link2)));
+        if (length("$link1$link2")) {
+            return ($link1 eq $link2);
         }
     }
-    $same = 0 if (<FILE2>);             # must be end of 2nd file
-    close FILE1;
-    close FILE2;
-    return $same;
+
+    # compare contents
+    return (! compare($file1, $file2));
 }
 
 # replace the second file with a hard link to the first
@@ -178,8 +182,8 @@ sub wanted()
     print "file2 = $file2\n" if ($debug);
 
     # next tests need stat info
-    my $stat1 = stat($file1);
-    my $stat2 = stat($file2);
+    my $stat1 = lstat($file1);
+    my $stat2 = lstat($file2);
     print "file1:\n", Dumper($stat1) if ($debug);
     print "file2:\n", Dumper($stat2) if ($debug);
     # in case stat fails
