@@ -101,7 +101,7 @@ def run_test(ver, arg):
     create_files()
     commands = (
         "./lnIdent.%s -d %s '%s' '%s'" % (ver, arg, dir1, dir2),
-        "diff -r '%s' '%s'" % (dir1, dir2),
+        "diff -r '%s' '%s'" % (dir1, dir2), # same3 linked, but content differs
         "ls -lR '%s' '%s'" % (dir1, dir2))
     for cmd in commands:
         print("%s: Command: %s" % (PROG, cmd))
