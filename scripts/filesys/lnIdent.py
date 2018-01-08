@@ -71,15 +71,16 @@ def stripSlash(dir):
     return dir
 
 def getLsI(file):
-    # TODO: replace ls with function
-    inode = str(subprocess.check_output("ls -i '" + file + "'", shell=True))
-    inode = re.sub(r'\s.*', '', inode)
+    # TODO: remove function if all OSs support os.lstat
+    # TODO: how do you ignore ls errors?
+    inode = subprocess.check_output("ls -i '" + file + "'", shell=True)
+    inode = int(re.sub(r'\s.*', '', inode.decode()))
     if debug: print("getLsI(", file, "): ", inode)
     return inode
 
 def areLinked(file1, file2, stat1, stat2):
     """See if already hard linked together"""
-    if (useInoDev): # use Perl ino/dev
+    if (useInoDev): # use os.lstat() ino, dev
         if (not stat1.st_ino): warn("no inode for: $file1")
         if debug: print("inodes: "+str(stat1.st_ino)+", "+str(stat2.st_ino))
         if ((stat1.st_dev == stat2.st_dev) and (stat1.st_ino == stat2.st_ino)):
@@ -137,7 +138,7 @@ def linkFromTo(file1, file2):
 def walk_file(dir1, dir2, file1):
     """Called in os.walk loop."""
     # was wanted() for find in Perl version
-    if debug: print("file1 = $file1")
+    if debug: print("file1 = " + file1)
 
     # strip off sub-path
     rest = file1.replace(dir1 + "/", "")
@@ -208,7 +209,8 @@ def main():
     global debug, quiet, verbose
     try:
         opts, args = getopt.getopt(sys.argv[1:],
-                "dhqv", ["debug", "help", "quiet", "verbose"])
+                "dhqv",
+                ["debug", "help", "ls", "quiet", "verbose"])
     except getopt.GetoptError as err:
         print(err)
         usage()
@@ -221,6 +223,8 @@ def main():
         elif o in ("-h", "--help"):
             usage()
             sys.exit()
+        elif o in ("--ls"):
+            useInoDev = False
         elif o in ("-q", "--quiet"):
             quiet = True
         elif o in ("-v", "--verbose"):
