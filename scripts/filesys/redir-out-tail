@@ -1,0 +1,13 @@
+#!/bin/bash -pux
+
+: ${OUT:=out}
+: ${NUM:=20}
+
+cp-0save $OUT
+
+date
+
+time "$@" >& $OUT
+
+echo $?
+tail -n $NUM $OUT
