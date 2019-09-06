@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# Copyright (c) 2006-2018 Daniel P. Kionka; all rights reserved
+# Copyright (c) 2006-2019 Daniel P. Kionka; all rights reserved
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -56,7 +56,8 @@ import sys
 useInoDev = True # (($^O ne "MSWin32") && ($^O ne "NetWare"))
 useLsI = True # Unix or Cygwin
 PROG = os.path.splitext(os.path.basename(sys.argv[0]))[0]
-tmpPrefix = "." + PROG + "." + str(os.getpid()) + "."
+PROG = os.path.basename(sys.argv[0])
+tmpPrefix = "." + os.path.splitext(PROG)[0] + "." + str(os.getpid()) + "."
 
 # parameters
 debug = False
@@ -64,6 +65,17 @@ quiet = False
 verbose = False
 
 # subroutines
+
+def debug_print(*args):
+    if debug:
+        print(*args)
+        sys.stdout.flush()
+
+def verbose_print(*args):
+    if verbose:
+        print(PROG + ":", end=" ")
+        print(*args)
+        sys.stdout.flush()
 
 def stripSlash(dir):
     """remove trailing slashes"""
@@ -129,16 +141,16 @@ def linkFromTo(file1, file2):
 
     # link and clean up
     os.link(file1, file2)
-    if (os.path.isfile(file2)):
+    if (os.path.samefile(file1, file2)):
         os.unlink(tmp2)
     else:
-        if verbose: print("link failed! moving back")
+        verbose_print("Link failed! Moving back...")
         shutil.move(tmp2, file2) or die("Cannot restore: ", tmp2)
 
 def walk_file(dir1, dir2, file1):
     """Called in os.walk loop."""
     # was wanted() for find in Perl version
-    if debug: print("file1 = " + file1)
+    debug_print("dir1=%s, dir2=%s, file1=%s" % (dir1, dir2, file1))
 
     # strip off sub-path
     rest = file1.replace(dir1 + "/", "")
@@ -153,7 +165,12 @@ def walk_file(dir1, dir2, file1):
     # does 2nd file exist?
     file2 = dir2 + "/" + rest
     if (not os.path.isfile(file2)):
-        if verbose: print("missing:", file2)
+        verbose_print("Missing:", file2)
+        return
+
+    # try python function
+    if (os.path.samefile(file1, file2)):
+        verbose_print("Same file")
         return
 
     # next tests need stat info
@@ -167,7 +184,7 @@ def walk_file(dir1, dir2, file1):
         return
     # skip if different sizes
     if (stat1.st_size != stat2.st_size):
-        if verbose: print("different size")
+        verbose_print("Different size")
         return
     if debug: print("same size")
 
@@ -180,7 +197,7 @@ def walk_file(dir1, dir2, file1):
     if (not areIdentical(file1, file2, stat1, stat2)):
         if verbose: print("not identical")
         return
-    if verbose: print("identical!")
+    verbose_print("Identical")
 
     # file identical -- which file to replace?
 
@@ -233,6 +250,8 @@ def main():
             ok = False
     if ((not ok) or (len(args) != 2)):
         assert False, "unhandled option"
+    if debug:
+        verbose = True
 
     dir1 = stripSlash(args[0])
     dir2 = stripSlash(args[1])
@@ -241,10 +260,12 @@ def main():
             die("Bad directory: ", dir)
 
     for (root, dirs, files) in os.walk(dir1):
+        root = root.replace("\\", "/") # for Windows
+        debug_print("root=%s, dirs=%s, files=%s" % (root, dirs, files))
         for file in files:
             walk_file(dir1, dir2, root + "/" + file)
 
-    if verbose: print(PROG + ": Succeeded")
+    verbose_print("Succeeded")
 
 main()
 sys.exit(0)
