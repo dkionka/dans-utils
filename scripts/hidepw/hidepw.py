@@ -15,24 +15,25 @@
 #
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 # EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-# LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-# WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-#
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #
 # hidepw -- Hide passwords in a matrix of random characters.
 #
 # TODO:
-# - allow punctuation
+# - add vertical strings
+# - add seed for test cases and documentation
 #
 
 import argparse
 import getopt
 import random
 import os
+import string
 import sys
 
 # variables
@@ -47,41 +48,56 @@ verbose = False
 # classes
 
 class GenCharacter:
-    def __init__(self, upper=False):
-        self.upper = upper
+    def __init__(self, numbers=False, punctuation=False, upper=False):
+        self.numbers     = numbers
+        self.punctuation = punctuation
+        self.upper       = upper
+
+    def is_legal(self, char):
+        if char.islower():
+            return True
+        if self.numbers and char.isdigit():
+            return True
+        if self.punctuation and char in string.punctuation:
+            return True
+        if self.upper and char.isupper():
+            return True
+        return False
 
     def get_random(self):
         while True:
             num = random.randint(ord(" ")+1, ord("~"))
             char = chr(num)
-            if char.isdigit() or char.islower():
+            if self.is_legal(char):
                 return char
-            if self.upper and char.isupper():
-                return char
+            debug_print("skip random: num=%d, char=%s" % (num, char))
 
 # subroutines
 
 def debug_print(*args):
     if debug:
         print(*args)
-        sys.stdout.flush()
+        sys.stderr.flush()
+
+def prog_print(*args):
+    print(PROG + ":", end=" ")
+    print(*args, file=sys.stderr)
+    sys.stderr.flush()
 
 def verbose_print(*args):
     if verbose:
-        print(PROG + ":", end=" ")
-        print(*args)
-        sys.stdout.flush()
+        prog_print(*args)
 
-def gen_matrix(gen_char, width, height, spacing, passwords):
-    debug_print("width=%s, height=%s, spacing=%s" % (width, height, spacing))
+def gen_matrix(gen_char, cols, rows, spacing, passwords):
+    debug_print("cols=%s, rows=%s, spacing=%s" % (cols, rows, spacing))
 
     # generate matrix
     matrix = []
     used = []
-    for y in range(height):
+    for y in range(rows):
         row = []
         urow = []
-        for x in range(width):
+        for x in range(cols):
             row.append(gen_char.get_random())
             urow.append(False)
         matrix.append(row)
@@ -91,30 +107,41 @@ def gen_matrix(gen_char, width, height, spacing, passwords):
     for pw in passwords:
         plen = len(pw)
         verbose_print("Insert password: %s, len=%d" % (pw, plen))
-        if plen == 0 or plen > width:
-            sys.exit("Password too long: " + pw)
+        if plen < 1 or plen > cols:
+            sys.exit(PROG + ": Password too long: " + pw)
         looking = True
-        while looking:
+        for count in range(100):
             # find place to put it
-            startx = random.randint(0, width - plen)
-            starty = random.randint(0, height - 1)
-            debug_print("startx=%s, starty=%s" % (startx, starty))
+            startx = random.randint(0, cols - plen)
+            starty = random.randint(0, rows - 1)
+            debug_print("startx=%d, starty=%d" % (startx, starty))
             collision = False
             for x in range(plen):
                 if used[starty][startx + x]:
+                    debug_print("collision: count=%d, x=%d" % (count, x))
                     collision = True
+            if collision:
+                continue
             # add if no collision
-            if not collision:
-                looking = False
-                for x in range(plen):
-                    matrix[starty][startx + x] = pw[x]
-                    used[starty][startx + x] = True
+            looking = False
+            invalid = ""
+            for x in range(plen):
+                if not gen_char.is_legal(pw[x]):
+                    invalid += pw[x]
+                matrix[starty][startx + x] = pw[x]
+                used[starty][startx + x] = True
+            if len(invalid):
+                prog_print("Invalid characters in password, %s: %s" %
+                        (pw, invalid))
+            break
+        if looking:
+            sys.exit(PROG + ": Cannot fit password: " + pw)
 
     # print matrix
-    for y in range(height):
+    for y in range(rows):
         str = ""
-        for x in range(width):
-            if len(str) > 0:
+        for x in range(cols):
+            if len(str):
                 str += spacing
             str += matrix[y][x]
         print(str)
@@ -127,22 +154,27 @@ def gen_matrix(gen_char, width, height, spacing, passwords):
 def main():
     global debug, verbose
     parser = argparse.ArgumentParser(
-            add_help=False, # want -h for height
             description='Hide passwords in a matrix of random characters.')
+    parser.add_argument('-a', '--all', action='store_true',
+            help='include all characters')
+    parser.add_argument('-c', '--columns', type=int, default=40,
+            help='columns of matrix')
     parser.add_argument('-d', '--debug', action='store_true',
             help='show debug output')
-    parser.add_argument('-h', '--height', type=int, default=10,
-            help='height of matrix')
+    parser.add_argument('-n', '--numbers', action='store_true',
+            help='include numbers')
+    parser.add_argument('-p', '--punctuation', action='store_true',
+            help='include punctuation')
+    parser.add_argument('-r', '--rows', type=int, default=20,
+            help='rows of matrix')
     parser.add_argument('-s', '--spacing', type=str, default=' ',
             help='spacing between characters ("," for spreadsheet)')
     parser.add_argument('-u', '--upper', action='store_true',
             help='include upper case')
     parser.add_argument('-v', '--verbose', action='store_true',
             help='show verbose output')
-    parser.add_argument('-w', '--width', type=int, default=20,
-            help='width of matrix')
-    parser.add_argument('passwords', nargs='*',
-            help='password')
+    parser.add_argument('password', nargs='*',
+            help='list of passwords')
     args = parser.parse_args()
     debug   = args.debug
     verbose = args.verbose
@@ -150,19 +182,24 @@ def main():
         verbose = True
 
     # read passwords from stdin when not on command line
-    if len(args.passwords) == 0:
-        verbose_print("Enter passwords:")
+    if not len(args.password):
+        verbose_print("Enter passwords, blank line to end:")
         for line in sys.stdin:
             line = line.strip()
-            if len(line) == 0:
+            if not len(line):
                 break
-            args.passwords.append(line)
+            args.password.append(line)
 
-    gen_char = GenCharacter(args.upper)
+    if args.all:
+        args.numbers     = True
+        args.punctuation = True
+        args.upper       = True
+    gen_char = GenCharacter(args.numbers, args.punctuation, args.upper)
 
-    gen_matrix(gen_char, args.width, args.height, args.spacing, args.passwords)
+    gen_matrix(gen_char, args.columns, args.rows, args.spacing, args.password)
 
     verbose_print("Succeeded")
 
-main()
-sys.exit(0)
+if __name__ == "__main__":
+    main()
+    sys.exit(0)
