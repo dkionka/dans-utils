@@ -48,13 +48,17 @@ verbose = False
 # classes
 
 class GenCharacter:
-    def __init__(self, numbers=False, punctuation=False, upper=False):
+    def __init__(self,
+            lower=True, numbers=False, punctuation=False, upper=False):
+        self.lower       = lower
         self.numbers     = numbers
         self.punctuation = punctuation
         self.upper       = upper
+        if not lower and not numbers and not punctuation and not upper:
+            sys.exit(PROG + ": no characters are enabled")
 
     def is_legal(self, char):
-        if char.islower():
+        if self.lower and char.islower():
             return True
         if self.numbers and char.isdigit():
             return True
@@ -80,7 +84,7 @@ def debug_print(*args):
         sys.stderr.flush()
 
 def prog_print(*args):
-    print(PROG + ":", end=" ")
+    print(PROG + ":", end=" ", file=sys.stderr)
     print(*args, file=sys.stderr)
     sys.stderr.flush()
 
@@ -153,6 +157,7 @@ def gen_matrix(gen_char, cols, rows, spacing, passwords):
 
 def main():
     global debug, verbose
+    lower = True
     parser = argparse.ArgumentParser(
             description='Hide passwords in a matrix of random characters.')
     parser.add_argument('-a', '--all', action='store_true',
@@ -163,6 +168,8 @@ def main():
             help='show debug output')
     parser.add_argument('-n', '--numbers', action='store_true',
             help='include numbers')
+    parser.add_argument('--no-lower', action='store_true',
+            help='exclude lowercase letters')
     parser.add_argument('-p', '--punctuation', action='store_true',
             help='include punctuation')
     parser.add_argument('-r', '--rows', type=int, default=20,
@@ -178,6 +185,7 @@ def main():
     args = parser.parse_args()
     debug   = args.debug
     verbose = args.verbose
+    debug_print("args = ", args)
     if debug:
         verbose = True
 
@@ -194,7 +202,10 @@ def main():
         args.numbers     = True
         args.punctuation = True
         args.upper       = True
-    gen_char = GenCharacter(args.numbers, args.punctuation, args.upper)
+        lower            = True
+    if args.no_lower:
+        lower = False
+    gen_char = GenCharacter(lower, args.numbers, args.punctuation, args.upper)
 
     gen_matrix(gen_char, args.columns, args.rows, args.spacing, args.password)
 
