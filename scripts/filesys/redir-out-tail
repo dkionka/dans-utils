@@ -9,5 +9,6 @@ date
 
 time "$@" >& $OUT
 
-echo $?
+err=$?
 tail -n $NUM $OUT
+exit $err
