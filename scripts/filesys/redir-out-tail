@@ -7,8 +7,9 @@ cp-0save $OUT
 
 date
 
-time "$@" >& $OUT
+time env SHELLOPTS= "$@" >& $OUT
 
 err=$?
+wc $OUT
 tail -n $NUM $OUT
 exit $err
