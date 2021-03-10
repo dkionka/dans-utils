@@ -86,7 +86,7 @@ def restore_space(pic):
 # feature functions
 
 def read_summary(sum_in):
-    verbose_print('read_summary:', sum_in)
+    debug_print('read_summary:', sum_in)
     info = {}
     with open(sum_in, 'r') as sum:
         for line in sum:
@@ -101,10 +101,10 @@ def read_summary(sum_in):
             debug_print(pic, ':', rec)
             info[pic] = rec
     return info
-    verbose_print('read_summary: Succeeded')
+    debug_print('read_summary: Succeeded')
 
 def find_pics(dirs_in):
-    verbose_print('find_pics: dirs_in=%s' % (dirs_in))
+    debug_print('find_pics: dirs_in=%s' % (dirs_in))
     found = []
 
     for dir in dirs_in:
@@ -117,16 +117,23 @@ def find_pics(dirs_in):
                     found.append(full)
                     debug_print(full)
 
-    verbose_print("find_pics: List...")
+    verbose_print("pics found:")
     for file in found:
         verbose_print(file)
 
     found.sort()
-    verbose_print('find_pics: Succeeded')
+    debug_print('find_pics: Succeeded')
     return found
 
+def check_output(cmd):
+    try:
+        return subprocess.check_output(cmd, shell=True)
+    except subprocess.CalledProcessError as e:
+        verbose_print('Error:', cmd)
+    return b''
+
 def get_details(pics):
-    verbose_print('get_details: len(pics)=%d' % (len(pics)))
+    debug_print('get_details: len(pics)=%d' % (len(pics)))
     info = {}
     for pic in pics:
         rec = {}
@@ -139,14 +146,13 @@ def get_details(pics):
             size = stat.st_size
             time = stat.st_mtime
         else:
-            verbose_print("stat error")
+            verbose_print("stat error:", pic)
         rec[size_key] = size
         rec[time_key] = time
         # checksum info
         sum_str = ''
         if not "'" in pic: # cannot have quote in name
-            sum_out = subprocess.check_output(
-                    checksum_prog + " '" + pic + "'", shell=True)
+            sum_out = check_output(checksum_prog + " '" + pic + "'")
             sum_str = re.sub(' .*', '', sum_out.decode().strip())
         if not len(sum_str):
             sum_str = def_checksum_val # cannot be empty
@@ -154,7 +160,7 @@ def get_details(pics):
         debug_print(pic, ':', rec)
         # save to dic
         info[pic] = rec
-    verbose_print('get_details: Succeeded')
+    debug_print('get_details: Succeeded')
     return info
 
 def find_duplicates(info):
@@ -173,7 +179,8 @@ def find_duplicates(info):
         plist = cksm_to_pic[cksm] if cksm in cksm_to_pic else []
         debug_print("cksm=%s, len=%d" % (cksm, len(plist)))
         plist.append(pic)
-        cksm_to_pic[cksm] = plist
+        if cksm != def_checksum_val:
+            cksm_to_pic[cksm] = plist
     # find biggest of all pics with duplicate basenames
     for base in base_to_pic:
         plist = base_to_pic[base]
@@ -205,10 +212,11 @@ def find_duplicates(info):
                     info[pic][dupl_key] = biggest
 
 def write_db(info, sum_out):
-    verbose_print('write_db: len(info)=%d, sum_out=%s' % (len(info), sum_out))
+    debug_print('write_db: len(info)=%d, sum_out=%s' % (len(info), sum_out))
     if not sum_out:
         return
     with open(sum_out, 'w') as sum:
+        verbose_print('write %d lines to: %s' % (len(info), sum_out))
         for pic in info:
             rec = info[pic]
             line = '%s %s %d %s' % (
@@ -220,7 +228,7 @@ def write_db(info, sum_out):
             sum.write(line + '\n')
 
 def copy_tree(info, info2, dir_out):
-    verbose_print('copy_tree: dir_out=%s' % (dir_out))
+    verbose_print('link to directory: %s' % (dir_out))
     for pic in info:
         rec = info[pic]
         base = os.path.basename(pic)
@@ -253,7 +261,7 @@ def copy_tree(info, info2, dir_out):
                 linked = True
                 verbose_print("linked:", full_path)
         debug_print('pic=%s, full_path=%s' % (pic, full_path))
-    verbose_print('copy_tree: Succeeded')
+    debug_print('copy_tree: Succeeded')
 
 #
 # mainline
@@ -282,6 +290,8 @@ def main():
     verbose = args.verbose
     if debug:
         verbose = True
+    if not len(args.link) and not len(args.output):
+        verbose_print("No link directory or output file")
 
     # get source tree
     if args.input and len(args.directory):
